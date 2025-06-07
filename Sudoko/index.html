@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sudoku Validator</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      background: #f0f0f0;
+    }
+    h1 { color: #333; }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(9, 40px);
+      gap: 3px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    .cell {
+      width: 40px;
+      height: 40px;
+      font-size: 18px;
+      text-align: center;
+      border: 1px solid #aaa;
+      background-color: #fff;
+      transition: 0.3s;
+    }
+    .selected {
+      background-color: #cdeefd;
+      border: 2px solid #007acc;
+    }
+    .highlight {
+      background-color: #ffe0b2 !important;
+    }
+    .duplicate {
+      background-color: #ffcccc !important;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+      background: #007acc;
+      color: white;
+      border: none;
+      border-radius: 5px;
+    }
+    #result {
+      font-weight: bold;
+      font-size: 18px;
+      margin-top: 15px;
+    }
+    #zone-count {
+      margin-top: 8px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Sudoku Validator with Custom Zones</h1>
+
+<div class="board" id="sudoku-board"></div>
+
+<div id="zone-count">🧩 Select 9 cells to define a custom zone.</div>
+<button onclick="addCustomZone()">➕ Add Custom Zone</button>
+<button onclick="validateSudoku()">✅ Validate Sudoku</button>
+
+<p id="result"></p>
+
+<script>
+  const boardElement = document.getElementById("sudoku-board");
+  const customZones = [];
+  let currentZone = [];
+
+  // Create 9x9 board
+  for (let row = 0; row < 9; row++) {
+    for (let col = 0; col < 9; col++) {
+      const input = document.createElement("input");
+      input.classList.add("cell");
+      input.dataset.row = row;
+      input.dataset.col = col;
+      input.maxLength = 1;
+
+      input.oninput = () => {
+        highlightSameNumbers(input.value);
+        checkForDuplicates();
+      };
+
+      input.onfocus = () => {
+        toggleCell(row, col, input);
+      };
+
+      boardElement.appendChild(input);
+    }
+  }
+
+  function toggleCell(row, col, cellElement) {
+    const index = currentZone.findIndex(pos => pos[0] === row && pos[1] === col);
+    if (index !== -1) {
+      currentZone.splice(index, 1);
+      cellElement.classList.remove("selected");
+    } else {
+      if (currentZone.length < 9) {
+        currentZone.push([row, col]);
+        cellElement.classList.add("selected");
+      } else {
+        alert("Only 9 cells allowed in a zone.");
+      }
+    }
+    document.getElementById("zone-count").innerText = `🧩 ${currentZone.length}/9 cells selected`;
+  }
+
+  function addCustomZone() {
+    if (currentZone.length !== 9) {
+      alert("Custom zone must contain exactly 9 cells!");
+      return;
+    }
+    customZones.push([...currentZone]);
+    currentZone.forEach(([r, c]) => {
+      document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`).classList.remove("selected");
+    });
+    currentZone = [];
+    document.getElementById("zone-count").innerText = `✅ Zone added! Select 9 more cells for next zone.`;
+  }
+
+  function validateSudoku() {
+    const board = Array.from({ length: 9 }, () => Array(9).fill('.'));
+    document.querySelectorAll(".cell").forEach(cell => {
+      const row = parseInt(cell.dataset.row);
+      const col = parseInt(cell.dataset.col);
+      const val = cell.value;
+      if (val >= '1' && val <= '9') board[row][col] = val;
+    });
+
+    const isValid = validate(board, customZones);
+    document.getElementById("result").innerText = isValid ? "✅ Valid Sudoku!" : "❌ Invalid Sudoku!";
+  }
+
+  function validate(board, zones) {
+    const seen = new Set();
+
+    for (let i = 0; i < 9; i++) {
+      for (let j = 0; j < 9; j++) {
+        const val = board[i][j];
+        if (val === '.') continue;
+        const row = `row-${i}-${val}`;
+        const col = `col-${j}-${val}`;
+        const box = `box-${Math.floor(i/3)}-${Math.floor(j/3)}-${val}`;
+        if (seen.has(row) || seen.has(col) || seen.has(box)) return false;
+        seen.add(row);
+        seen.add(col);
+        seen.add(box);
+      }
+    }
+
+    for (const zone of zones) {
+      const zSeen = new Set();
+      for (const [i, j] of zone) {
+        const val = board[i][j];
+        if (val === '.') continue;
+        if (zSeen.has(val)) return false;
+        zSeen.add(val);
+      }
+    }
+
+    return true;
+  }
+
+  function highlightSameNumbers(value) {
+    document.querySelectorAll(".cell").forEach(cell => {
+      cell.classList.remove("highlight");
+      if (cell.value === value && value >= '1' && value <= '9') {
+        cell.classList.add("highlight");
+      }
+    });
+  }
+
+  function checkForDuplicates() {
+    document.querySelectorAll(".cell").forEach(cell => cell.classList.remove("duplicate"));
+
+    const rows = Array.from({ length: 9 }, () => ({}));
+    const cols = Array.from({ length: 9 }, () => ({}));
+
+    document.querySelectorAll(".cell").forEach(cell => {
+      const r = +cell.dataset.row;
+      const c = +cell.dataset.col;
+      const v = cell.value;
+      if (v >= '1' && v <= '9') {
+        if (rows[r][v]) rows[r][v].push(cell); else rows[r][v] = [cell];
+        if (cols[c][v]) cols[c][v].push(cell); else cols[c][v] = [cell];
+      }
+    });
+
+    for (let i = 0; i < 9; i++) {
+      for (let val in rows[i]) {
+        if (rows[i][val].length > 1) rows[i][val].forEach(cell => cell.classList.add("duplicate"));
+      }
+      for (let val in cols[i]) {
+        if (cols[i][val].length > 1) cols[i][val].forEach(cell => cell.classList.add("duplicate"));
+      }
+    }
+  }
+</script>
+
+</body>
+</html>
